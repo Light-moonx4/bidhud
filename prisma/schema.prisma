@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum AuctionStatus {
+  ACTIVE
+  CLOSED
+  DESERTED
+  CANCELED
+}
+
+model User {
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String
+  email            String   @unique
+  passwordHash     String   @map("password_hash")
+  refreshTokenHash String?  @map("refresh_token_hash")
+  role             Role     @default(USER)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  auctions Auction[]
+  bids     Bid[]
+
+  @@map("users")
+}
+
+model Category {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  auctions Auction[]
+
+  @@map("categories")
+}
+
+model Auction {
+  id               String        @id @default(uuid()) @db.Uuid
+  title            String
+  description      String
+  imageUrl         String        @map("image_url")
+  initialPrice     Decimal       @map("initial_price") @db.Decimal(10, 2)
+  minimumIncrement Decimal       @map("minimum_increment") @db.Decimal(10, 2)
+  currentPrice     Decimal       @map("current_price") @db.Decimal(10, 2)
+  closingDate      DateTime      @map("closing_date")
+  status           AuctionStatus @default(ACTIVE)
+  cancelReason     String?       @map("cancel_reason")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  sellerId   String @map("seller_id") @db.Uuid
+  categoryId String @map("category_id") @db.Uuid
+
+  seller   User     @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  bids     Bid[]
+
+  @@index([status, closingDate])
+  @@index([categoryId])
+  @@index([sellerId])
+  @@map("auctions")
+}
+
+model Bid {
+  id        String   @id @default(uuid()) @db.Uuid
+  amount    Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  auctionId String @map("auction_id") @db.Uuid
+  bidderId  String @map("bidder_id") @db.Uuid
+
+  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  bidder  User    @relation(fields: [bidderId], references: [id], onDelete: Restrict)
+
+  @@index([auctionId, amount])
+  @@index([bidderId])
+  @@map("bids")
+}
